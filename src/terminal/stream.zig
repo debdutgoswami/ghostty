@@ -125,6 +125,7 @@ pub const Action = union(Key) {
     kitty_color_report: kitty.color.OSC,
     color_operation: ColorOperation,
     semantic_prompt: SemanticPrompt,
+    prompt_open_url: PromptOpenUrl,
 
     pub const Key = lib.Enum(
         lib.target,
@@ -222,6 +223,7 @@ pub const Action = union(Key) {
             "kitty_color_report",
             "color_operation",
             "semantic_prompt",
+            "prompt_open_url",
         },
     );
 
@@ -328,6 +330,19 @@ pub const Action = union(Key) {
 
         pub fn cval(self: ReportPwd) ReportPwd.C {
             return .init(self.url);
+        }
+    };
+
+    pub const PromptOpenUrl = struct {
+        /// Base64-encoded URL as carried in the OSC 1337 OpenURL payload.
+        /// Decoding happens in the stream handler so the parser's capture
+        /// buffer doesn't have to be mutated.
+        encoded: []const u8,
+
+        pub const C = lib.String;
+
+        pub fn cval(self: PromptOpenUrl) PromptOpenUrl.C {
+            return .init(self.encoded);
         }
     };
 
@@ -2027,6 +2042,12 @@ pub fn Stream(comptime H: type) type {
                     self.handler.vt(.show_desktop_notification, .{
                         .title = v.title,
                         .body = v.body,
+                    });
+                },
+
+                .prompt_open_url => |v| {
+                    self.handler.vt(.prompt_open_url, .{
+                        .encoded = v.encoded,
                     });
                 },
 

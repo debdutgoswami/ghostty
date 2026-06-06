@@ -306,6 +306,7 @@ const DerivedConfig = struct {
     confirm_close_surface: configpkg.ConfirmCloseSurface,
     cursor_click_to_move: bool,
     desktop_notifications: bool,
+    osc_1337_open_url: bool,
     font: font.SharedGridSet.DerivedConfig,
     mouse_interval: u64,
     mouse_hide_while_typing: bool,
@@ -385,6 +386,7 @@ const DerivedConfig = struct {
             .confirm_close_surface = config.@"confirm-close-surface",
             .cursor_click_to_move = config.@"cursor-click-to-move",
             .desktop_notifications = config.@"desktop-notifications",
+            .osc_1337_open_url = config.@"osc-1337-open-url",
             .font = try font.SharedGridSet.DerivedConfig.init(alloc, config),
             .mouse_interval = config.@"click-repeat-interval" * 1_000_000, // 500ms
             .mouse_hide_while_typing = config.@"mouse-hide-while-typing",
@@ -1085,6 +1087,20 @@ pub fn handleMessage(self: *Surface, msg: Message) !void {
             const title = std.mem.sliceTo(&notification.title, 0);
             const body = std.mem.sliceTo(&notification.body, 0);
             try self.showDesktopNotification(title, body);
+        },
+
+        .open_url => |w| {
+            defer w.deinit();
+
+            // The stream handler already validated the config gate and
+            // stripped control characters, but re-checking the gate here
+            // keeps the policy enforcement local to the surface.
+            if (!self.config.osc_1337_open_url) {
+                log.info("ignoring OSC 1337 OpenURL: 'osc-1337-open-url' is disabled", .{});
+                return;
+            }
+
+            try self.openUrl(.{ .kind = .unknown, .url = w.slice() });
         },
 
         .renderer_health => |health| self.updateRendererHealth(health),

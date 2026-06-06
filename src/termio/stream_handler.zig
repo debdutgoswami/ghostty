@@ -53,6 +53,11 @@ pub const StreamHandler = struct {
     /// The color reporting format for OSC requests.
     osc_color_report_format: configpkg.Config.OSCColorReportFormat,
 
+    /// Whether OSC 1337 OpenURL sequences are honored. Defaults to off
+    /// since the sequence lets the program in the terminal open arbitrary
+    /// URLs on the host machine.
+    osc_1337_open_url: bool,
+
     /// The clipboard write access configuration.
     clipboard_write: configpkg.ClipboardAccess,
 
@@ -108,6 +113,7 @@ pub const StreamHandler = struct {
     /// Change the configuration for this handler.
     pub fn changeConfig(self: *StreamHandler, config: *termio.DerivedConfig) void {
         self.osc_color_report_format = config.osc_color_report_format;
+        self.osc_1337_open_url = config.osc_1337_open_url;
         self.clipboard_write = config.clipboard_write;
         self.enquiry_response = config.enquiry_response;
         self.default_cursor_style = config.cursor_style;
@@ -327,6 +333,7 @@ pub const StreamHandler = struct {
             .window_title => try self.windowTitle(value.title),
             .report_pwd => try self.reportPwd(value.url),
             .show_desktop_notification => try self.showDesktopNotification(value.title, value.body),
+            .prompt_open_url => try self.promptOpenUrl(value.encoded),
             .progress_report => self.progressReport(value),
             .start_hyperlink => try self.startHyperlink(value.uri, value.id),
             .clipboard_contents => try self.clipboardContents(value.kind, value.data),
@@ -1443,6 +1450,58 @@ pub const StreamHandler = struct {
             // string and send it to the terminal.
             const msg = try termio.Message.writeReq(self.alloc, response.items);
             self.messageWriter(msg);
+        }
+    }
+
+    fn promptOpenUrl(
+        self: *StreamHandler,
+        encoded: []const u8,
+    ) !void {
+        // OSC 1337 OpenURL allows the program running in the terminal to
+        // request that the host open an arbitrary URL. This is dangerous
+        // by nature (a remote SSH session could pop arbitrary handlers on
+        // the local machine) so it must be explicitly enabled by the user.
+        if (!self.osc_1337_open_url) {
+            log.info("ignoring OSC 1337 OpenURL: 'osc-1337-open-url' is disabled", .{});
+            return;
+        }
+
+        // The payload is base64-standard encoded per the iTerm2 spec.
+        const Decoder = std.base64.standard.Decoder;
+        const decoded_len = Decoder.calcSizeForSlice(encoded) catch {
+            log.warn("OSC 1337 OpenURL: invalid base64 payload", .{});
+            return;
+        };
+
+        // Reject absurdly long URLs early to avoid pointless allocations.
+        // 8 KiB is well beyond any reasonable URL but small enough that an
+        // accidental garbage payload can't OOM us.
+        if (decoded_len > 8 * 1024) {
+            log.warn("OSC 1337 OpenURL: payload too large ({} bytes)", .{decoded_len});
+            return;
+        }
+
+        const buf = try self.alloc.alloc(u8, decoded_len);
+        defer self.alloc.free(buf);
+        Decoder.decode(buf, encoded) catch {
+            log.warn("OSC 1337 OpenURL: invalid base64 payload", .{});
+            return;
+        };
+
+        // Reject control characters / non-printable bytes — these have no
+        // business appearing in a URL and almost always indicate either a
+        // bug or an attack attempt.
+        for (buf) |c| {
+            if (c < 0x20 or c == 0x7f) {
+                log.warn("OSC 1337 OpenURL: rejecting URL with control characters", .{});
+                return;
+            }
+        }
+
+        if (apprt.surface.Message.WriteReq.init(self.alloc, buf)) |req| {
+            self.surfaceMessageWriter(.{ .open_url = req });
+        } else |err| {
+            log.warn("OSC 1337 OpenURL: failed to enqueue url err={}", .{err});
         }
     }
 
