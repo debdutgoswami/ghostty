@@ -26,3 +26,9 @@ clean:
 		macos/build \
 		macos/GhosttyKit.xcframework
 .PHONY: clean
+
+# Cut a personal-fork release. Usage:  make release VERSION=1.3.2-osc1337.2
+release:
+	@[ -n "$(VERSION)" ] || { echo "usage: make release VERSION=<version>"; exit 2; }
+	./dist/release-fork.sh $(VERSION)
+.PHONY: release
