@@ -58,6 +58,10 @@ pub const StreamHandler = struct {
     /// URLs on the host machine.
     osc_1337_open_url: bool,
 
+    /// Comma-separated allowlist of URL schemes the OSC 1337 OpenURL
+    /// action may dispatch. Empty disables the allowlist (any scheme).
+    osc_1337_open_url_allowed_schemes: []const u8,
+
     /// The clipboard write access configuration.
     clipboard_write: configpkg.ClipboardAccess,
 
@@ -114,6 +118,7 @@ pub const StreamHandler = struct {
     pub fn changeConfig(self: *StreamHandler, config: *termio.DerivedConfig) void {
         self.osc_color_report_format = config.osc_color_report_format;
         self.osc_1337_open_url = config.osc_1337_open_url;
+        self.osc_1337_open_url_allowed_schemes = config.osc_1337_open_url_allowed_schemes;
         self.clipboard_write = config.clipboard_write;
         self.enquiry_response = config.enquiry_response;
         self.default_cursor_style = config.cursor_style;
@@ -1472,6 +1477,35 @@ pub const StreamHandler = struct {
         for (buf) |c| {
             if (c < 0x20 or c == 0x7f) {
                 log.warn("OSC 1337 OpenURL: rejecting URL with control characters", .{});
+                return;
+            }
+        }
+
+        // Scheme allowlist. Empty allowlist = allow any scheme.
+        if (self.osc_1337_open_url_allowed_schemes.len > 0) {
+            const colon = std.mem.indexOfScalar(u8, buf, ':') orelse {
+                log.warn("OSC 1337 OpenURL: URL has no scheme, rejecting", .{});
+                return;
+            };
+            const scheme = buf[0..colon];
+
+            var iter = std.mem.tokenizeAny(
+                u8,
+                self.osc_1337_open_url_allowed_schemes,
+                ", \t",
+            );
+            var allowed = false;
+            while (iter.next()) |s| {
+                if (std.ascii.eqlIgnoreCase(scheme, s)) {
+                    allowed = true;
+                    break;
+                }
+            }
+            if (!allowed) {
+                log.warn(
+                    "OSC 1337 OpenURL: scheme '{s}' not in allowlist, rejecting",
+                    .{scheme},
+                );
                 return;
             }
         }
