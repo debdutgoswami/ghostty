@@ -3699,6 +3699,24 @@ else
 /// Defaults to `false`.
 @"osc-1337-open-url": bool = false,
 
+/// Comma-separated list of URL schemes the OSC 1337 OpenURL action is
+/// allowed to dispatch. Matching is case-insensitive.
+///
+/// Empty (the default) means "no scheme allowlist" — any scheme that the
+/// host can resolve will be opened. Setting this restricts OSC 1337
+/// OpenURL to only the listed schemes; URLs with other schemes are
+/// rejected and logged.
+///
+/// Useful for tightening the blast radius when only specific workflows
+/// need OSC 1337. For example, to permit only Zed deeplinks:
+///
+///     osc-1337-open-url-allowed-schemes = zed
+///
+/// To allow Zed plus web links:
+///
+///     osc-1337-open-url-allowed-schemes = zed,https,http
+@"osc-1337-open-url-allowed-schemes": []const u8 = "",
+
 /// If `true` (default), applications running in the terminal can show
 /// graphical progress bars using the ConEmu OSC 9;4 escape sequence.
 /// If `false`, progress bar sequences are silently ignored.
