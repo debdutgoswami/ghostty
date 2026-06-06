@@ -60,6 +60,11 @@ pub const Message = union(enum) {
         body: [255:0]u8,
     },
 
+    /// A program in the terminal asked the host to open a URL (OSC 1337
+    /// OpenURL). The Surface validates the URL and gates this behind the
+    /// `osc-1337-open-url` config option before performing the open.
+    open_url: WriteReq,
+
     /// Health status change for the renderer.
     renderer_health: renderer.Health,
 

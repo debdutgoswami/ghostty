@@ -160,6 +160,16 @@ pub const Command = union(Key) {
     /// https://uapi-group.org/specifications/specs/osc_context/
     context_signal: parsers.context_signal.Command,
 
+    /// OSC 1337 OpenURL. iTerm2 proprietary sequence requesting the
+    /// terminal emulator to open a URL on the local machine. The
+    /// payload is the base64-encoded URL exactly as it was sent — the
+    /// decode happens downstream so the parser stays allocation-free.
+    /// https://iterm2.com/documentation-escape-codes.html
+    prompt_open_url: struct {
+        /// Base64-encoded URL.
+        encoded: [:0]const u8,
+    },
+
     pub const SemanticPrompt = parsers.semantic_prompt.Command;
 
     pub const KittyClipboardProtocol = parsers.kitty_clipboard_protocol.OSC;
@@ -193,6 +203,7 @@ pub const Command = union(Key) {
             "kitty_text_sizing",
             "kitty_clipboard_protocol",
             "context_signal",
+            "prompt_open_url",
         },
     );
 
@@ -425,6 +436,7 @@ pub const Parser = struct {
             .kitty_text_sizing,
             .kitty_clipboard_protocol,
             .context_signal,
+            .prompt_open_url,
             => {},
         }
 

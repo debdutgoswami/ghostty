@@ -3645,6 +3645,21 @@ else
 /// notifications using certain escape sequences such as OSC 9 or OSC 777.
 @"desktop-notifications": bool = true,
 
+/// If `true`, applications running in the terminal can ask Ghostty to open
+/// arbitrary URLs on the host machine using the iTerm2 OSC 1337 `OpenURL`
+/// escape sequence. The URL is dispatched to the host using the same
+/// mechanism as clicking a hyperlink.
+///
+/// This is dangerous when set to `true` because the program running inside
+/// the terminal (which may be a remote SSH session) can trigger arbitrary
+/// URL handlers on the local machine — including `mailto:`, `zoom:`,
+/// `file://`, and custom-scheme handlers like `zed://`. Only enable this
+/// if you trust the programs running in your terminals and want to use
+/// remote workflows such as `zed .` over SSH to open the local Zed editor.
+///
+/// Defaults to `false`.
+@"osc-1337-open-url": bool = false,
+
 /// If `true` (default), applications running in the terminal can show
 /// graphical progress bars using the ConEmu OSC 9;4 escape sequence.
 /// If `false`, progress bar sequences are silently ignored.

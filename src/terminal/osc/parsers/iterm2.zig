@@ -154,6 +154,23 @@ pub fn parse(parser: *Parser, _: ?u8) ?*Command {
             return &parser.command;
         },
 
+        .OpenURL => {
+            const value = value_ orelse {
+                parser.command = .invalid;
+                return null;
+            };
+            if (value.len == 0) {
+                parser.command = .invalid;
+                return null;
+            }
+            parser.command = .{
+                .prompt_open_url = .{
+                    .encoded = value,
+                },
+            };
+            return &parser.command;
+        },
+
         .AddAnnotation,
         .AddHiddenAnnotation,
         .Block,
@@ -170,7 +187,6 @@ pub fn parse(parser: *Parser, _: ?u8) ?*Command {
         .FilePart,
         .HighlightCursorLine,
         .MultipartFile,
-        .OpenURL,
         .PopKeyLabels,
         .PushKeyLabels,
         .RemoteHost,
@@ -432,4 +448,46 @@ test "OSC: 1337: test CurrentDir with non-empty value" {
     const cmd = p.end('\x1b').?.*;
     try testing.expect(cmd == .report_pwd);
     try testing.expectEqualStrings("abc123", cmd.report_pwd.value);
+}
+
+test "OSC: 1337: test OpenURL with no value" {
+    const testing = std.testing;
+
+    var p: Parser = .init(testing.allocator);
+    defer p.deinit();
+
+    const input = "1337;OpenURL";
+    for (input) |ch| p.next(ch);
+
+    try testing.expect(p.end('\x1b') == null);
+}
+
+test "OSC: 1337: test OpenURL with empty value" {
+    const testing = std.testing;
+
+    var p: Parser = .init(testing.allocator);
+    defer p.deinit();
+
+    const input = "1337;OpenURL=";
+    for (input) |ch| p.next(ch);
+
+    try testing.expect(p.end('\x1b') == null);
+}
+
+test "OSC: 1337: test OpenURL with base64 value" {
+    const testing = std.testing;
+
+    var p: Parser = .init(testing.allocator);
+    defer p.deinit();
+
+    // base64("zed://ssh-remote+host/tmp") = "emVkOi8vc3NoLXJlbW90ZStob3N0L3RtcA=="
+    const input = "1337;OpenURL=emVkOi8vc3NoLXJlbW90ZStob3N0L3RtcA==";
+    for (input) |ch| p.next(ch);
+
+    const cmd = p.end('\x1b').?.*;
+    try testing.expect(cmd == .prompt_open_url);
+    try testing.expectEqualStrings(
+        "emVkOi8vc3NoLXJlbW90ZStob3N0L3RtcA==",
+        cmd.prompt_open_url.encoded,
+    );
 }
